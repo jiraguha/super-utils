@@ -31,23 +31,24 @@ This tool allows you to easily configure Pulumi stack settings from a `.env` fil
 Install with a single command:
 
 ```bash
-curl -s https://raw.githubusercontent.com/jiraguha/super-utils/main/pulumi-env/install.sh | zsh
+curl -s https://raw.githubusercontent.com/YOUR_USERNAME/pulumi-env-config/main/install.sh | zsh
 ```
 
 This will:
-1. Clone the repository to `~/.pulumi-env-config`
-2. Add the ZSH functions to your `.zshrc` file
+1. Download the necessary files directly (no repository cloning)
+2. Install the script to `~/.local/bin/pulumi-env`
+3. Add the ZSH functions to your `.zshrc` or `.bashrc` file
 
 ### Manual Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/jiraguha/super-utils/pulumi-env.git
+   git clone https://github.com/YOUR_USERNAME/pulumi-env-config.git
    ```
 
 2. Add the following to your `.zshrc` file:
    ```bash
-   source /path/to/pulumi-env/zshrc-functions.sh
+   source /path/to/pulumi-env-config/pulumi-env-zshrc-functions.sh
    ```
 
 ## Usage
@@ -116,6 +117,7 @@ The following command-line options are available:
 | `--env-file=FILE` | Specify a different .env file | `.env` |
 | `--dry-run` | Show what would be set without making changes | `false` |
 | `--no-camel-case` | Keep original variable names | `false` |
+| `--suffix=SUFFIX` | Add suffix to variable names | None |
 
 ## Examples
 
@@ -174,11 +176,37 @@ EOL
 penvr terraform.env
 ```
 
+### Example 4: Adding Environment Suffix
+
+```bash
+# Create a .env file
+cat > .env << EOL
+#@secret
+API_KEY=1234567890
+DATABASE_URL=postgres://user:password@localhost:5432/db
+DEBUG=true
+EOL
+
+# Add 'prod' suffix to all variable names
+penv --suffix=prod
+
+# This will set:
+# - apiKeyProd (secret): 1234567890
+# - databaseUrlProd (secret): postgres://user:password@localhost:5432/db
+# - debugProd: true
+
+# Use the environment-specific alias
+penv-prod
+
+# Combine with dry run
+penvd --suffix=prod
+```
+
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Permission denied**: Make sure the script is executable with `chmod +x pulumi-env.ts`
+1. **Permission denied**: Make sure the script is executable with `chmod +x deno-pulumi-env.ts`
 2. **Deno not found**: Install Deno from [deno.land](https://deno.land/#installation)
 3. **Pulumi not configured**: Run `pulumi login` to configure Pulumi CLI
 4. **No active stack**: Use `pulumi stack select` to select a stack

@@ -77,6 +77,7 @@ pulumi_env_help() {
   echo "  --env-file=FILE            Specify an environment file (default: .env)"
   echo "  --dry-run                  Test without making changes"
   echo "  --no-camel-case            Keep original variable names"
+  echo "  --suffix=SUFFIX            Add suffix to variable names (e.g., --suffix=prod)"
   echo
   echo "Examples:"
   echo "  penv                       # Use default .env file"
