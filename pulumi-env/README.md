@@ -31,7 +31,7 @@ This tool allows you to easily configure Pulumi stack settings from a `.env` fil
 Install with a single command:
 
 ```bash
-curl -s https://raw.githubusercontent.com/YOUR_USERNAME/pulumi-env-config/main/install.sh | zsh
+curl -s https://raw.githubusercontent.com/jiraguha/super-utils/pulumi-env/main/install.sh | zsh
 ```
 
 This will:
@@ -42,12 +42,12 @@ This will:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/pulumi-env-config.git
+   git clone https://github.com/jiraguha/super-utils/pulumi-env.git
    ```
 
 2. Add the following to your `.zshrc` file:
    ```bash
-   source /path/to/pulumi-env-config/pulumi-env-zshrc-functions.sh
+   source /path/to/pulumi-env/zshrc-functions.sh
    ```
 
 ## Usage
@@ -178,7 +178,7 @@ penvr terraform.env
 
 ### Common Issues
 
-1. **Permission denied**: Make sure the script is executable with `chmod +x deno-pulumi-env.ts`
+1. **Permission denied**: Make sure the script is executable with `chmod +x pulumi-env.ts`
 2. **Deno not found**: Install Deno from [deno.land](https://deno.land/#installation)
 3. **Pulumi not configured**: Run `pulumi login` to configure Pulumi CLI
 4. **No active stack**: Use `pulumi stack select` to select a stack
