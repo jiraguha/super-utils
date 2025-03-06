@@ -100,7 +100,7 @@ async function setPulumiConfig(key: string, value: string, secret: boolean = fal
 
   if (code !== 0) {
     const errorOutput = new TextDecoder().decode(await process.stderrOutput());
-    console.error(`Failed to set config ${camelKey}: ${errorOutput}`);
+    console.error(`Failed to set config ${finalKey}: ${errorOutput}`);
   }
 
   process.close();
