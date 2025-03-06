@@ -18,10 +18,6 @@ pulumi_env() {
   # Build command with appropriate flags
   local cmd_args=""
   
-  if [[ "$env_file" != ".env" ]]; then
-    cmd_args="$cmd_args --env-file=$env_file"
-  fi
-  
   if [[ "$dry_run" == "true" ]]; then
     cmd_args="$cmd_args --dry-run"
   fi
@@ -33,7 +29,7 @@ pulumi_env() {
   echo "Setting Pulumi config from $env_file file..."
   
   # Run the Deno script directly from URL (or use local version if preferred)
-  deno run --allow-read --allow-run https://raw.githubusercontent.com/jiraguha/super-utils/refs/heads/main/pulumi-env/index.ts $cmd_args
+  deno run --allow-read --allow-run https://raw.githubusercontent.com/jiraguha/super-utils/refs/heads/main/pulumi-env/index.ts --env-file=$env_file" $cmd_args
 }
 
 # Function for dry-run mode
