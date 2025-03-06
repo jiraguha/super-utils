@@ -31,7 +31,7 @@ This tool allows you to easily configure Pulumi stack settings from a `.env` fil
 Install with a single command:
 
 ```bash
-curl -s https://raw.githubusercontent.com/jiraguha/super-utils/pulumi-env/main/install.sh | zsh
+curl -s https://raw.githubusercontent.com/jiraguha/super-utils/main/pulumi-env/install.sh | zsh
 ```
 
 This will:
