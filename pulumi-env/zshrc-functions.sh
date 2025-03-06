@@ -33,7 +33,7 @@ pulumi_env() {
   echo "Setting Pulumi config from $env_file file..."
   
   # Run the Deno script directly from URL (or use local version if preferred)
-  deno run --allow-read --allow-run https://raw.githubusercontent.com/YOUR_USERNAME/pulumi-env-config/main/deno-pulumi-env.ts $cmd_args
+  deno run --allow-read --allow-run https://raw.githubusercontent.com/jiraguha/super-utils/refs/heads/main/pulumi-env/index.ts $cmd_args
 }
 
 # Function for dry-run mode
