@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Pulumi Env Config Manager Installer
-# This script clones the repo and sources the zsh functions file
+# This script downloads and sets up the Pulumi Env Config Manager without cloning
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -11,9 +11,12 @@ NC='\033[0m' # No Color
 
 # Configuration
 GITHUB_USER="jiraguha"
-REPO_NAME="pulumi-env"
-INSTALL_DIR="$HOME/.pulumi-env"
-ZSH_FUNCTIONS_FILE="zshrc-functions.sh"
+REPO_NAME="super-utils"
+INSTALL_DIR="$HOME/.local/bin"
+CONFIG_DIR="$HOME/.super-script"
+ZSH_FUNCTIONS_NAME="pulumi-env"
+ZSH_FUNCTIONS_FILE="$ZSH_FUNCTIONS_NAME.sh"
+SCRIPT_NAME="deno-pulumi-env.ts"
 ZSHRC_FILE="$HOME/.zshrc"
 BASHRC_FILE="$HOME/.bashrc"
 
@@ -24,40 +27,50 @@ log() {
   echo "${color}${message}${NC}"
 }
 
-# Check if git is installed
-check_git() {
-  if ! command -v git &> /dev/null; then
-    log $RED "Git is not installed!"
-    echo "Please install Git before continuing."
+# Check if curl is installed
+check_curl() {
+  if ! command -v curl &> /dev/null; then
+    log $RED "curl is not installed!"
+    echo "Please install curl before continuing."
     return 1
   fi
-  
+
   return 0
 }
 
-# Clone or update the repository
-clone_repo() {
-  if [[ -d "$INSTALL_DIR" ]]; then
-    log $YELLOW "Repository already exists. Updating..."
-    cd "$INSTALL_DIR" && git pull
-  else
-    log $YELLOW "Cloning repository..."
-    git clone "https://github.com/$GITHUB_USER/super-utils/$REPO_NAME.git" "$INSTALL_DIR"
-  fi
-  
+# Create necessary directories
+create_dirs() {
+  mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
+
   if [[ $? -ne 0 ]]; then
-    log $RED "Failed to clone or update repository."
+    log $RED "Failed to create directories."
     return 1
   fi
-  
-  log $GREEN "Repository ready."
+
+  return 0
+}
+
+# Download files directly from GitHub
+download_files() {
+  # Download the zsh functions file
+  local funcs_url="https://raw.githubusercontent.com/$GITHUB_USER/$REPO_NAME/main/$ZSH_FUNCTIONS_NAME/zshrc-functions.sh"
+  local funcs_dest="$CONFIG_DIR/$ZSH_FUNCTIONS_FILE"
+
+  log $YELLOW "Downloading shell functions..."
+  if curl -s "$funcs_url" -o "$funcs_dest"; then
+    log $GREEN "Shell functions downloaded!"
+  else
+    log $RED "Failed to download shell functions."
+    return 1
+  fi
+
   return 0
 }
 
 # Update shell configuration
 update_shell_config() {
   local shell_type
-  
+
   # Determine which shell configuration to update
   if [[ -n "$ZSH_VERSION" ]]; then
     shell_type="zsh"
@@ -70,22 +83,32 @@ update_shell_config() {
     shell_type="zsh"
     config_file="$ZSHRC_FILE"
   fi
-  
+
   log $YELLOW "Updating $shell_type configuration..."
-  
+
   # Check if already sourced
-  if grep -q "$INSTALL_DIR/$ZSH_FUNCTIONS_FILE" "$config_file"; then
+  if grep -q "$CONFIG_DIR/$ZSH_FUNCTIONS_FILE" "$config_file"; then
     log $YELLOW "Functions are already sourced in your $shell_type configuration."
     return 0
   fi
-  
+
   # Add source line to shell config
   echo "" >> "$config_file"
   echo "# Added by Pulumi Env Config installer on $(date)" >> "$config_file"
-  echo "if [[ -f \"$INSTALL_DIR/$ZSH_FUNCTIONS_FILE\" ]]; then" >> "$config_file"
-  echo "  source \"$INSTALL_DIR/$ZSH_FUNCTIONS_FILE\"" >> "$config_file"
+  echo "if [[ -f \"$CONFIG_DIR/$ZSH_FUNCTIONS_FILE\" ]]; then" >> "$config_file"
+  echo "  source \"$CONFIG_DIR/$ZSH_FUNCTIONS_FILE\"" >> "$config_file"
   echo "fi" >> "$config_file"
-  
+
+  # Make sure the bin directory is in PATH
+  if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo "" >> "$config_file"
+    echo "# Add Pulumi Env Config to PATH" >> "$config_file"
+    echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$config_file"
+
+    # Update current session
+    export PATH="$PATH:$INSTALL_DIR"
+  fi
+
   log $GREEN "Updated $shell_type configuration to source the functions file."
   return 0
 }
@@ -102,7 +125,7 @@ show_usage() {
   echo "     - penvd                   # Dry run with default .env file"
   echo "     - penvr                   # Use raw variable names (no camelCase)"
   echo ""
-  
+
   if [[ "$GITHUB_USER" == "YOUR_USERNAME" ]]; then
     log $YELLOW "Don't forget to update the repository URL in this script"
     log $YELLOW "before distributing it (replace YOUR_USERNAME)."
@@ -113,12 +136,13 @@ show_usage() {
 main() {
   echo ""
   log $YELLOW "Installing Pulumi Env Config Manager..."
-  
+
   # Check dependencies
-  check_git || return 1
-  
+  check_curl || return 1
+
   # Install
-  clone_repo || return 1
+  create_dirs || return 1
+  download_files || return 1
   update_shell_config
   show_usage
 }
