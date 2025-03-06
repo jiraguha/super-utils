@@ -1,7 +1,7 @@
 # Pulumi Env Config Functions for .zshrc
 # Add these functions to your .zshrc file
 
-# Function to configure Pulumi from .env file
+# Function to set Pulumi config from .env file
 pulumi_env() {
   # Default values
   local env_file=${1:-.env}
@@ -15,25 +15,25 @@ pulumi_env() {
     return 1
   fi
   
-  echo "Setting Pulumi config from $env_file file..."
-  
   # Build command with appropriate flags
-  local cmd="pulumi-env"
+  local cmd_args=""
   
   if [[ "$env_file" != ".env" ]]; then
-    cmd="$cmd --env-file=$env_file"
+    cmd_args="$cmd_args --env-file=$env_file"
   fi
   
   if [[ "$dry_run" == "true" ]]; then
-    cmd="$cmd --dry-run"
+    cmd_args="$cmd_args --dry-run"
   fi
   
   if [[ "$no_camel_case" == "true" ]]; then
-    cmd="$cmd --no-camel-case"
+    cmd_args="$cmd_args --no-camel-case"
   fi
   
-  # Run the command
-  eval "$cmd"
+  echo "Setting Pulumi config from $env_file file..."
+  
+  # Run the Deno script directly from URL (or use local version if preferred)
+  deno run --allow-read --allow-run https://raw.githubusercontent.com/YOUR_USERNAME/pulumi-env-config/main/deno-pulumi-env.ts $cmd_args
 }
 
 # Function for dry-run mode
@@ -55,10 +55,10 @@ pulumi_env_raw() {
   pulumi_env "$env_file" "$dry_run" true
 }
 
-# Completion function for pulumi_env commands
+# Add autocompletion for env files
 _pulumi_env_complete() {
   local env_files
-  local curr_word=$words[CURRENT]
+  local dry_run_options
   
   # If completing the first argument, suggest env files in current directory
   if [[ $CURRENT -eq 2 ]]; then
@@ -66,28 +66,26 @@ _pulumi_env_complete() {
     _describe 'env files' env_files
   # If completing the second argument for pulumi_env
   elif [[ $CURRENT -eq 3 && $words[1] == "pulumi_env" ]]; then
-    _values 'dry run' true false
+    dry_run_options=("true" "false")
+    _describe 'dry run' dry_run_options
   # If completing the third argument for pulumi_env
   elif [[ $CURRENT -eq 4 && $words[1] == "pulumi_env" ]]; then
-    _values 'camel case' true false
+    camel_case_options=("true" "false")
+    _describe 'camel case' camel_case_options
   # If completing the second argument for pulumi_env_raw
   elif [[ $CURRENT -eq 3 && $words[1] == "pulumi_env_raw" ]]; then
-    _values 'dry run' true false
+    dry_run_options=("true" "false")
+    _describe 'dry run' dry_run_options
   fi
 }
 
-# Register completion function
+# Register completion functions
 compdef _pulumi_env_complete pulumi_env pulumi_env_dry pulumi_env_raw
 
-# Aliases for convenience
+# Add aliases for convenience
 alias penv='pulumi_env'
 alias penvd='pulumi_env_dry'
 alias penvr='pulumi_env_raw'
 
-# Usage examples:
-# penv                  # Use default .env file with camelCase conversion
-# penv prod.env         # Use prod.env file with camelCase conversion
-# penvd                 # Dry run with default .env file
-# penvd staging.env     # Dry run with staging.env file
-# penvr                 # Use default .env file without camelCase conversion
-# penvr prod.env true   # Dry run with prod.env file without camelCase conversion
+# Set default values (uncomment and customize as needed)
+# export PULUMI_DEFAULT_ENV_FILE=".env.production"
