@@ -35,7 +35,13 @@ async function readEnvFile(filePath = ".env") {
       const match = trimmedLine.match(/^([^=]+)=(.*)$/);
       if (match) {
         const key = match[1].trim();
-        const value = match[2].trim();
+        let value = match[2].trim();
+
+        // Handle quoted values
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
 
         env[key] = value;
 
@@ -71,7 +77,7 @@ async function setPulumiConfig(key: string, value: string, secret: boolean = fal
 
   // If in dry run mode, just log what would happen
   if (dryRun) {
-    console.log(`[DRY RUN] Would set ${secret ? "secret" : "plain"} config: ${finalKey}=${value} (from ${key})`);
+    console.log(`[DRY RUN] Would set ${secret ? "secret" : "plain"} config: ${finalKey} to ${value} (from ${key})`);
     return true;
   }
 
