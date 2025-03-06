@@ -1,87 +1,89 @@
 # Pulumi Env Config Functions for .zshrc
 # Add these functions to your .zshrc file
 
-# Function to set Pulumi config from .env file
-pulumi_env() {
-  # Default values
-  local env_file=${1:-.env}
-  local dry_run=${2:-false}
-  local no_camel_case=${3:-false}
-  
-  # Check if pulumi is installed
-  if ! command -v pulumi &> /dev/null; then
-    echo "Error: Pulumi CLI is not installed."
-    echo "Please install it from: https://www.pulumi.com/docs/get-started/install/"
-    return 1
-  fi
-  
-  # Build command with appropriate flags
-  local cmd_args=""
-  
-  if [[ "$dry_run" == "true" ]]; then
-    cmd_args="$cmd_args --dry-run"
-  fi
-  
-  if [[ "$no_camel_case" == "true" ]]; then
-    cmd_args="$cmd_args --no-camel-case"
-  fi
-  
-  echo "Setting Pulumi config from $env_file file..."
-  
-  # Run the Deno script directly from URL (or use local version if preferred)
-  deno run --allow-read --allow-run https://raw.githubusercontent.com/jiraguha/super-utils/refs/heads/main/pulumi-env/index.ts --env-file=$env_file" $cmd_args
-}
+# Base alias to run the script from URL
+alias pulumi-env="deno run --allow-read --allow-run https://raw.githubusercontent.com/jiraguha/super-utils/refs/heads/main/pulumi-env/index.ts"
 
-# Function for dry-run mode
-pulumi_env_dry() {
-  # Default to .env if no file is specified
-  local env_file=${1:-.env}
-  
-  echo "Dry run: testing Pulumi config from $env_file..."
-  pulumi_env "$env_file" true false
-}
+# Convenience aliases
+alias penv="pulumi-env"
+alias penvd="pulumi-env --dry-run"
+alias penvr="pulumi-env --no-camel-case"
+alias penvdr="pulumi-env --dry-run --no-camel-case"
 
-# Function for no camel case mode
-pulumi_env_raw() {
-  # Default to .env if no file is specified
-  local env_file=${1:-.env}
-  local dry_run=${2:-false}
-  
-  echo "Using raw variable names (no camelCase conversion)..."
-  pulumi_env "$env_file" "$dry_run" true
-}
-
-# Add autocompletion for env files
+# Enhanced completion for pulumi-env commands
 _pulumi_env_complete() {
-  local env_files
-  local dry_run_options
-  
-  # If completing the first argument, suggest env files in current directory
-  if [[ $CURRENT -eq 2 ]]; then
-    env_files=($(ls -1 | grep -E '\.env.*$'))
-    _describe 'env files' env_files
-  # If completing the second argument for pulumi_env
-  elif [[ $CURRENT -eq 3 && $words[1] == "pulumi_env" ]]; then
-    dry_run_options=("true" "false")
-    _describe 'dry run' dry_run_options
-  # If completing the third argument for pulumi_env
-  elif [[ $CURRENT -eq 4 && $words[1] == "pulumi_env" ]]; then
-    camel_case_options=("true" "false")
-    _describe 'camel case' camel_case_options
-  # If completing the second argument for pulumi_env_raw
-  elif [[ $CURRENT -eq 3 && $words[1] == "pulumi_env_raw" ]]; then
-    dry_run_options=("true" "false")
-    _describe 'dry run' dry_run_options
-  fi
+  local state
+  local -a env_files options
+
+  _arguments -C \
+    '--env-file=[Specify an environment file]:env file:->env_files' \
+    '--dry-run[Test without making changes]' \
+    '--no-camel-case[Keep original variable names]' \
+    '*:env file:->env_files'
+
+  case $state in
+    env_files)
+      # Find all .env* files in current directory
+      env_files=($(ls -1 | grep -E '\.env.*$' 2>/dev/null))
+      if [[ ${#env_files} -eq 0 ]]; then
+        # If no .env files found, suggest creating one
+        _message "No .env files found. Create one first."
+      else
+        # Show available .env files with descriptions
+        local -a env_file_descriptions
+        for file in $env_files; do
+          # Add description based on filename
+          case $file in
+            .env.production|production.env)
+              env_file_descriptions+=("$file:Production environment")
+              ;;
+            .env.staging|staging.env)
+              env_file_descriptions+=("$file:Staging environment")
+              ;;
+            .env.development|development.env|.env.dev|dev.env)
+              env_file_descriptions+=("$file:Development environment")
+              ;;
+            .env.local|local.env)
+              env_file_descriptions+=("$file:Local environment")
+              ;;
+            .env)
+              env_file_descriptions+=("$file:Default environment")
+              ;;
+            *)
+              env_file_descriptions+=("$file:Custom environment")
+              ;;
+          esac
+        done
+        _describe -t env_files "Environment files" env_file_descriptions
+      fi
+      ;;
+  esac
 }
 
-# Register completion functions
-compdef _pulumi_env_complete pulumi_env pulumi_env_dry pulumi_env_raw
+# Register completion
+compdef _pulumi_env_complete pulumi-env penv penvd penvr penvdr
 
-# Add aliases for convenience
-alias penv='pulumi_env'
-alias penvd='pulumi_env_dry'
-alias penvr='pulumi_env_raw'
+# Print usage info for the command
+pulumi_env_help() {
+  echo "Pulumi Env Config - Set Pulumi config from .env files"
+  echo
+  echo "Usage:"
+  echo "  penv [options] [file]      Set Pulumi config from .env file"
+  echo "  penvd [file]               Dry run (test without making changes)"
+  echo "  penvr [file]               Use raw variable names (no camelCase)"
+  echo "  penvdr [file]              Dry run with raw variable names"
+  echo
+  echo "Options:"
+  echo "  --env-file=FILE            Specify an environment file (default: .env)"
+  echo "  --dry-run                  Test without making changes"
+  echo "  --no-camel-case            Keep original variable names"
+  echo
+  echo "Examples:"
+  echo "  penv                       # Use default .env file"
+  echo "  penv production.env        # Use production.env file"
+  echo "  penvd staging.env          # Dry run with staging.env"
+  echo "  penvr .env.local           # Use raw names with .env.local"
+}
 
-# Set default values (uncomment and customize as needed)
-# export PULUMI_DEFAULT_ENV_FILE=".env.production"
+# Alias for help
+alias penvh="pulumi_env_help"
