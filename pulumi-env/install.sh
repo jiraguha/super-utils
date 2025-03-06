@@ -10,7 +10,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Configuration
-GITHUB_USER="YOUR_USERNAME"
+GITHUB_USER="jiraguha"
 REPO_NAME="pulumi-env"
 INSTALL_DIR="$HOME/.pulumi-env"
 ZSH_FUNCTIONS_FILE="zshrc-functions.sh"
@@ -42,7 +42,7 @@ clone_repo() {
     cd "$INSTALL_DIR" && git pull
   else
     log $YELLOW "Cloning repository..."
-    git clone "https://github.com/$GITHUB_USER/$REPO_NAME.git" "$INSTALL_DIR"
+    git clone "https://github.com/$GITHUB_USER/super-utils/$REPO_NAME.git" "$INSTALL_DIR"
   fi
   
   if [[ $? -ne 0 ]]; then
