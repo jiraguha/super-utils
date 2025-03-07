@@ -125,7 +125,6 @@ main() {
   create_dirs || return 1
   download_files || return 1
   update_shell_config
-  show_usage
 }
 
 # Run the installation
