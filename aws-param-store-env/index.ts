@@ -89,13 +89,23 @@ async function setParameterStoreValue(key: string, value: string, secret: boolea
   });
 
   const { code } = await process.status();
-
   if (code !== 0) {
     const errorOutput = new TextDecoder().decode(await process.stderrOutput());
     console.error(`Failed to set parameter ${paramName}: ${errorOutput}`);
   } else {
-    const output = new TextDecoder().decode(await process.stdoutOutput());
-    console.log(`  Success! Version: ${JSON.parse(output).Version}`);
+    try {
+      const stdout = await process.output();
+      const output = new TextDecoder().decode(stdout);
+      if (output && output.trim()) {
+        const result = JSON.parse(output);
+        console.log(`  Success! Version: ${result.Version}`);
+      } else {
+        console.log(`  Success!`);
+      }
+    } catch (error) {
+      // If we can't parse the output, just show success
+      console.log(`  Success! ${error}`);
+    }
   }
 
   process.close();
