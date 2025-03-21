@@ -1,0 +1,129 @@
+{
+    "version": 3,
+    "deployment": {
+        "manifest": {
+            "time": "2025-03-19T18:16:25.709648+01:00",
+            "magic": "7c53c69df7094e39d5562ed2abf1e12099c2c54a7b9b411faca1dcb7ec1fef8a",
+            "version": "v3.145.0"
+        },
+        "secrets_providers": {
+            "type": "service",
+            "state": {
+                "url": "https://api.pulumi.com",
+                "owner": "cocom",
+                "project": "pulumi-migrate-test",
+                "stack": "dev"
+            }
+        },
+        "metadata": {},
+        "resources": [
+            {
+                "urn": "urn:pulumi:dev::pulumi-migrate-test::pulumi:pulumi:Stack::pulumi-migrate-test-dev",
+                "custom": false,
+                "type": "pulumi:pulumi:Stack",
+                "outputs": {
+                    "bucketName": "my-bucket-090f772"
+                },
+                "created": "2025-03-19T17:16:21.44878Z",
+                "modified": "2025-03-19T17:16:21.44878Z",
+                "sourcePosition": "project:///node_modules/.pnpm/@pulumi+pulumi@3.157.0_typescript@5.8.2/node_modules/@pulumi/runtime/stack.ts#38,23"
+            },
+            {
+                "urn": "urn:pulumi:dev::pulumi-migrate-test::pulumi:providers:aws::default_6_72_0",
+                "custom": true,
+                "id": "d3525cdc-0af8-43e3-a60b-e59c94f98317",
+                "type": "pulumi:providers:aws",
+                "inputs": {
+                    "__internal": {},
+                    "region": "eu-west-3",
+                    "skipCredentialsValidation": "false",
+                    "skipRegionValidation": "true",
+                    "version": "6.72.0"
+                },
+                "outputs": {
+                    "region": "eu-west-3",
+                    "skipCredentialsValidation": "false",
+                    "skipRegionValidation": "true",
+                    "version": "6.72.0"
+                },
+                "created": "2025-03-19T17:16:23.651285Z",
+                "modified": "2025-03-19T17:16:23.651285Z"
+            },
+            {
+                "urn": "urn:pulumi:dev::pulumi-migrate-test::aws:s3/bucketV2:BucketV2::my-bucket",
+                "custom": true,
+                "id": "my-bucket-090f772",
+                "type": "aws:s3/bucketV2:BucketV2",
+                "inputs": {
+                    "__defaults": [
+                        "bucket",
+                        "forceDestroy"
+                    ],
+                    "bucket": "my-bucket-090f772",
+                    "forceDestroy": false
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":3600000000000,\"read\":1200000000000,\"update\":1200000000000}}",
+                    "accelerationStatus": "",
+                    "acl": null,
+                    "arn": "arn:aws:s3:::my-bucket-090f772",
+                    "bucket": "my-bucket-090f772",
+                    "bucketDomainName": "my-bucket-090f772.s3.amazonaws.com",
+                    "bucketPrefix": "",
+                    "bucketRegionalDomainName": "my-bucket-090f772.s3.eu-west-3.amazonaws.com",
+                    "corsRules": [],
+                    "forceDestroy": false,
+                    "grants": [
+                        {
+                            "id": "07e049efe203fca672cdf03023c9551a550e7883d1cd1d19a7e6fa24adc3df0e",
+                            "permissions": [
+                                "FULL_CONTROL"
+                            ],
+                            "type": "CanonicalUser",
+                            "uri": ""
+                        }
+                    ],
+                    "hostedZoneId": "Z3R1K369G5AVDG",
+                    "id": "my-bucket-090f772",
+                    "lifecycleRules": [],
+                    "loggings": [],
+                    "objectLockConfiguration": null,
+                    "objectLockEnabled": false,
+                    "policy": "",
+                    "region": "eu-west-3",
+                    "replicationConfigurations": [],
+                    "requestPayer": "BucketOwner",
+                    "serverSideEncryptionConfigurations": [
+                        {
+                            "rules": [
+                                {
+                                    "applyServerSideEncryptionByDefaults": [
+                                        {
+                                            "kmsMasterKeyId": "",
+                                            "sseAlgorithm": "AES256"
+                                        }
+                                    ],
+                                    "bucketKeyEnabled": false
+                                }
+                            ]
+                        }
+                    ],
+                    "versionings": [
+                        {
+                            "enabled": false,
+                            "mfaDelete": false
+                        }
+                    ],
+                    "websiteDomain": null,
+                    "websiteEndpoint": null,
+                    "websites": []
+                },
+                "parent": "urn:pulumi:dev::pulumi-migrate-test::pulumi:pulumi:Stack::pulumi-migrate-test-dev",
+                "provider": "urn:pulumi:dev::pulumi-migrate-test::pulumi:providers:aws::default_6_72_0::d3525cdc-0af8-43e3-a60b-e59c94f98317",
+                "created": "2025-03-19T17:16:25.164885Z",
+                "modified": "2025-03-19T17:16:25.164885Z",
+                "sourcePosition": "project:///index.ts#6,16"
+            }
+        ]
+    }
+}
