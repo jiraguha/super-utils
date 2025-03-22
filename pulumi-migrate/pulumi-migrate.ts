@@ -19,8 +19,8 @@ import { bgGreen, black, bold, red, yellow, green, blue } from "https://deno.lan
 
 // Define command line arguments
 const args = parse(Deno.args, {
-  string: ["stack", "bucket", "region", "workspace", "encryption-key", "dynamodb-table"],
-  boolean: ["help", "delete-source", "skip-verify", "verbose", "create-bucket", "create-dynamodb"],
+  string: ["stack", "bucket", "region", "workspace", "encryption-key", "dynamodb-table", "passphrase", "kms-alias", "secrets-provider"],
+  boolean: ["help", "delete-source", "skip-verify", "verbose", "create-bucket", "create-dynamodb", "create-kms"],
   alias: {
     h: "help",
     s: "stack",
@@ -31,6 +31,8 @@ const args = parse(Deno.args, {
     v: "verbose",
     k: "encryption-key",
     t: "dynamodb-table",
+    p: "passphrase",
+    a: "kms-alias",
   },
   default: {
     region: Deno.env.get("AWS_REGION") || "eu-west-3",
@@ -39,6 +41,9 @@ const args = parse(Deno.args, {
     "skip-verify": false,
     "create-bucket": true,
     "create-dynamodb": false,
+    "create-kms": true,
+    "kms-alias": "alias/pulumi-secrets",
+    "secrets-provider": "awskms",
     verbose: false
   }
 });
@@ -276,7 +281,7 @@ async function exportStackState(stack: string, workspacePath: string): Promise<s
   log(`Exporting stack state for "${stack}" to ${statePath}...`);
   
   const { success, output } = await executeCommand(
-    ["pulumi", "stack", "export", "--stack", stack, "--file", statePath],
+    ["pulumi", "stack", "export","--show-secrets", "--stack", stack, "--file", statePath],
     { cwd: workspacePath }
   );
 
@@ -286,6 +291,54 @@ async function exportStackState(stack: string, workspacePath: string): Promise<s
   }
 
   return statePath;
+}
+
+/**
+ * Export the stack state from Pulumi Cloud
+ */
+async function changeSecretProdider(stack: string,
+  workspacePath: string, 
+  secretsProvider: string, 
+  secretsConfig: { 
+  passphrase?: string; 
+  kmsAlias?: string; 
+  region: string;
+}): Promise<string | null> {
+
+  const initCommand = ["pulumi", "stack", "change-secrets-provider"];
+  if (secretsProvider === "passphrase") {
+    // For passphrase secrets provider
+    if (secretsConfig.passphrase) {
+      // Set environment variable for the child process
+      Deno.env.set("PULUMI_CONFIG_PASSPHRASE", secretsConfig.passphrase);
+      log(`Will use passphrase for secrets encryption`, "info");
+      initCommand.push("passphrase");
+
+    } else {
+      log(`No passphrase provided for passphrase secrets provider. Expect errors or prompts.`, "error");
+      Deno.exit(1);
+    }
+  } else{
+  const kmsAlias = secretsConfig.kmsAlias || "alias/pulumi-secrets";
+  const region = secretsConfig.region;
+  
+  // Build the awskms:// URL
+  const kmsKeyId = kmsAlias.startsWith("alias/") ? kmsAlias : `alias/${kmsAlias}`;
+  const secretsProviderUrl = `awskms://${kmsKeyId}`;
+  
+
+  initCommand.push(secretsProviderUrl)
+  }
+  log(`Changing secret provider stack state for "${stack}"...`);
+  initCommand.push( "--stack", stack);
+  const { success, output } = await executeCommand(initCommand ,{ cwd: workspacePath }
+  );
+  if (!success) {
+    log(`Failed to change-secrets-provider stack state: ${output}`, "error");
+    Deno.exit(1);
+  }
+
+  return secretsProvider;
 }
 
 /**
@@ -375,15 +428,120 @@ async function loginToS3Backend(bucket: string, region: string, dynamoDBTable?: 
 }
 
 /**
+ * Check if KMS alias exists
+ */
+async function checkKmsAliasExists(alias: string, region: string): Promise<boolean> {
+  try {
+    // Remove "alias/" prefix if it exists for the API call
+    const aliasName = alias.startsWith("alias/") ? alias : `alias/${alias}`;
+    
+    const { success } = await executeCommand(
+      ["aws", "kms", "describe-key", "--key-id", aliasName, "--region", region],
+      { silent: true }
+    );
+    return success;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Create KMS key and alias for Pulumi secrets
+ */
+async function createKmsKeyAndAlias(alias: string, region: string): Promise<string | null> {
+  log(`Creating KMS key and alias "${alias}" for Pulumi secrets...`);
+  
+  try {
+    // 1. Create KMS key
+    log(`Creating KMS key...`);
+    const { success: keyCreated, output: keyOutput } = await executeCommand([
+      "aws", "kms", "create-key",
+      "--description", "'Pulumi State Encryption Key'",
+      "--tags", "TagKey=Purpose,TagValue=PulumiStateEncryption",
+      "--region", region
+    ]);
+    
+    if (!keyCreated) {
+      log(`Failed to create KMS key`, "error");
+      return null;
+    }
+    
+    // Parse key ID from output
+    const keyData = JSON.parse(keyOutput);
+    const keyId = keyData.KeyMetadata.KeyId;
+    
+    // 2. Create alias for the key
+    const aliasName = alias.startsWith("alias/") ? alias.substring(6) : alias;
+    log(`Creating KMS alias "${alias}" for key ${keyId}...`);
+    
+    const { success: aliasCreated } = await executeCommand([
+      "aws", "kms", "create-alias",
+      "--alias-name", `alias/${aliasName}`,
+      "--target-key-id", keyId,
+      "--region", region
+    ]);
+    
+    if (!aliasCreated) {
+      log(`Failed to create KMS alias, but key was created with ID: ${keyId}`, "warning");
+      return keyId;
+    }
+    
+    log(`KMS key and alias created successfully`, "success");
+    return alias;
+  } catch (error) {
+    log(`Error creating KMS resources: ${error.message}`, "error");
+    return null;
+  }
+}
+
+/**
  * Create a new stack in the S3 backend
  */
-async function createStackInS3(stack: string, workspacePath: string): Promise<boolean> {
+async function createStackInS3(
+  stack: string, 
+  workspacePath: string, 
+  secretsProvider: string, 
+  secretsConfig: { 
+    passphrase?: string; 
+    kmsAlias?: string; 
+    region: string;
+  }
+): Promise<boolean> {
   log(`Creating stack "${stack}" in S3 backend...`);
-
   const [orgName, stackName] = stack.split('/');
   
+  // Prepare command
+  const initCommand = ["pulumi", "stack", "init", stackName, "--non-interactive"];
+  
+  // Configure secrets provider
+  if (secretsProvider === "passphrase") {
+    // For passphrase secrets provider
+    if (secretsConfig.passphrase) {
+      // Set environment variable for the child process
+      Deno.env.set("PULUMI_CONFIG_PASSPHRASE", secretsConfig.passphrase);
+      log(`Using passphrase for secrets encryption`, "info");
+    } else {
+      log(`No passphrase provided for passphrase secrets provider. Expect errors or prompts.`, "warning");
+    }
+  } else if (secretsProvider === "awskms") {
+    // For AWS KMS secrets provider
+    const kmsAlias = secretsConfig.kmsAlias || "alias/pulumi-secrets";
+    const region = secretsConfig.region;
+    
+    // Build the awskms:// URL
+    const kmsKeyId = kmsAlias.startsWith("alias/") ? kmsAlias : `alias/${kmsAlias}`;
+    const secretsProviderUrl = `awskms://${kmsKeyId}`;
+    
+    initCommand.push("--secrets-provider", secretsProviderUrl);
+    log(`Using AWS KMS for secrets encryption: ${secretsProviderUrl}`, "info");
+  } else if (secretsProvider !== "default") {
+    // For any other provider specified
+    initCommand.push("--secrets-provider", secretsProvider);
+    log(`Using custom secrets provider: ${secretsProvider}`, "info");
+  }
+  
   const { success, output } = await executeCommand(
-    ["pulumi", "stack", "init", stackName, "--non-interactive"],
+    initCommand,
     { cwd: workspacePath }
   );
 
@@ -401,8 +559,9 @@ async function createStackInS3(stack: string, workspacePath: string): Promise<bo
 async function importStackState(stack: string, statePath: string, workspacePath: string): Promise<boolean> {
   log(`Importing stack state from ${statePath}...`);
   
+  const [orgName, stackName] = stack.split('/');
   const { success, output } = await executeCommand(
-    ["pulumi", "stack", "import", "--stack", stack, "--file", statePath],
+    ["pulumi", "stack", "import", "--stack", stackName, "--file", statePath],
     { cwd: workspacePath }
   );
 
@@ -419,19 +578,22 @@ async function importStackState(stack: string, statePath: string, workspacePath:
  */
 async function verifyMigration(stack: string, workspacePath: string): Promise<boolean> {
   log(`Verifying stack migration (expecting no changes)...`);
-  
+  const [orgName, stackName] = stack.split('/');
   const { success, output } = await executeCommand(
-    ["pulumi", "preview", "--stack", stack, "--diff"],
+    ["pulumi", "preview", "--stack", stackName, "--diff"],
     { cwd: workspacePath }
   );
 
-  // Check if no changes were detected
-  const noChanges = output.includes("no changes") || 
-                    output.includes("0 resources to create") && 
-                    output.includes("0 resources to update") && 
-                    output.includes("0 resources to delete");
+  // More robust change detection
+  const hasChanges = (
+    // Check for direct change indicators
+    // Also check newer format with resources summary section 
+    output.includes("+ ") && output.match(/\+\s+\d+\s+to create/) ||
+    output.includes("~ ") && output.match(/~\s+\d+\s+to update/) ||
+    output.includes("- ") && output.match(/-\s+\d+\s+to delete/)
+  );
 
-  if (!success || !noChanges) {
+  if (!success || hasChanges) {
     log(`Verification failed: unexpected changes detected`, "warning");
     console.log(output);
     return false;
@@ -513,7 +675,11 @@ async function migrateStack() {
     "skip-verify": skipVerify,
     "create-bucket": createBucketIfNotExists,
     "create-dynamodb": createDynamoDBIfNotExists,
-    "dynamodb-table": dynamoDBTable
+    "dynamodb-table": dynamoDBTable,
+    "secrets-provider": secretsProvider,
+    passphrase,
+    "kms-alias": kmsAlias,
+    "create-kms": createKmsIfNotExists
   } = args;
   
   // Check if S3 bucket exists and create if needed
@@ -551,6 +717,44 @@ async function migrateStack() {
     }
   }
   
+  // Handle KMS key for secrets if using AWS KMS
+  let finalKmsAlias = kmsAlias;
+  if (secretsProvider === "awskms") {
+    const aliasName = kmsAlias.startsWith("alias/") ? kmsAlias : `alias/${kmsAlias}`;
+    const kmsExists = await checkKmsAliasExists(aliasName, region);
+    
+    if (!kmsExists) {
+      if (createKmsIfNotExists) {
+        log(`KMS alias "${aliasName}" doesn't exist, creating new KMS key and alias...`);
+        const kmsCreated = await createKmsKeyAndAlias(aliasName, region);
+        if (!kmsCreated) {
+          log(`Failed to create KMS key and alias. Please create them manually or check your permissions.`, "error");
+          log(`Continuing with default secrets provider...`, "warning");
+          // Fall back to passphrase if provided, otherwise use environment variable
+          if (passphrase) {
+            log(`Using provided passphrase as fallback`, "info");
+            Deno.env.set("PULUMI_CONFIG_PASSPHRASE", passphrase);
+          } else {
+            log(`No passphrase provided. Pulumi will prompt for one or use PULUMI_CONFIG_PASSPHRASE env var if set.`, "warning");
+          }
+        } else {
+          finalKmsAlias = kmsCreated;
+        }
+      } else {
+        log(`KMS alias "${aliasName}" doesn't exist and --create-kms is disabled.`, "warning");
+        log(`Falling back to passphrase secrets provider...`, "warning");
+        // Fall back to passphrase
+        if (passphrase) {
+          log(`Using provided passphrase as fallback`, "info");
+          Deno.env.set("PULUMI_CONFIG_PASSPHRASE", passphrase);
+        }
+      }
+    }
+  } else if (secretsProvider === "passphrase" && passphrase) {
+    // Set passphrase environment variable if using passphrase provider
+    Deno.env.set("PULUMI_CONFIG_PASSPHRASE", passphrase);
+  }
+  
   // Migration steps
   let backendUrl = `s3://${bucket}?region=${region}`;
   if (dynamoDBTable) {
@@ -558,6 +762,13 @@ async function migrateStack() {
   }
   
   log(`Starting migration of stack "${stack}" to backend: ${backendUrl}...`, "info");
+  const secretsConfig = {
+    passphrase: passphrase,
+    kmsAlias: finalKmsAlias,
+    region: region
+  };
+
+  await changeSecretProdider(stack, workspace, secretsProvider,secretsConfig);
   
   // 1. Export stack state
   const statePath = await exportStackState(stack, workspace);
@@ -571,8 +782,10 @@ async function migrateStack() {
     Deno.exit(1);
   }
   
-  // 3. Create stack in S3
-  const stackCreateSuccess = await createStackInS3(stack, workspace);
+  // 3. Create stack in S3 with proper secrets configuration
+
+  
+  const stackCreateSuccess = await createStackInS3(stack, workspace, secretsProvider, secretsConfig);
   if (!stackCreateSuccess) {
     Deno.exit(1);
   }
@@ -618,6 +831,14 @@ async function migrateStack() {
   // 7. Clean up
   await cleanUpTempFiles();
   
+  // Describe the secrets provider in the final message
+  let secretsInfo = "";
+  if (secretsProvider === "awskms") {
+    secretsInfo = `\n4. Your stack is using AWS KMS for secrets encryption with key: ${finalKmsAlias}`;
+  } else if (secretsProvider === "passphrase") {
+    secretsInfo = `\n4. Your stack is using passphrase encryption for secrets. Make sure to set PULUMI_CONFIG_PASSPHRASE in your environment.`;
+  }
+  
   log(`Stack "${stack}" successfully migrated to backend: ${backendUrl}`, "success");
   console.log();
   
@@ -625,7 +846,7 @@ async function migrateStack() {
   console.log(`${bold("Next steps:")}
 1. Confirm your stack is working correctly by running: ${green("pulumi stack select " + stack)}
 2. Verify your infrastructure with: ${green("pulumi preview")}
-3. Update any CI/CD pipelines to use the new backend URL: ${green(backendUrl)}
+3. Update any CI/CD pipelines to use the new backend URL: ${green(backendUrl)}${secretsInfo}
 `);
 }
 
