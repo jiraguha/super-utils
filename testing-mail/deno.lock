@@ -1,0 +1,16 @@
+{
+  "version": "4",
+  "redirects": {
+    "https://deno.land/std/async/delay.ts": "https://deno.land/std@0.224.0/async/delay.ts"
+  },
+  "remote": {
+    "https://deno.land/std@0.224.0/async/delay.ts": "f90dd685b97c2f142b8069082993e437b1602b8e2561134827eeb7c12b95c499"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:mail.tm-api@^3.0.1"
+      ]
+    }
+  }
+}
